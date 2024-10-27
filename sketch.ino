@@ -43,3 +43,59 @@ void setup()
   Serial.print("connected: ");
   Serial.println(WiFi.localIP());
 
+ // Config Temperature
+  sensors.begin();
+}
+
+void loop()
+{
+  float latitud = 0.0, longitud = 0.0;
+
+  obtenerCoordenadas(latitud, longitud); // Obtener coordenadas
+  enviarDatos(latitud, longitud);
+
+  // Leer temperatura
+  sensors.requestTemperatures();
+  float temperatureC = sensors.getTempCByIndex(0);
+  Serial.print(temperatureC);
+  Serial.println("ºC");
+
+  // Enviar los datos
+  if (temperatureC != DEVICE_DISCONNECTED_C) {
+    sendTemperatureData(id, temperatureC, petId);
+  } else {
+    Serial.println("Error al leer la temperatura.");
+  }
+
+  delay(900000);// 15 minutos
+}
+
+// Enviar datos a la API
+void sendTemperatureData(int id, float temperature, int petId) {
+  if (WiFi.status() == WL_CONNECTED) {
+    client.begin(TemperatureEndpoint);
+    client.addHeader("Content-Type", "application/json");
+
+    StaticJsonDocument<200> jsonDoc;
+    jsonDoc["id"] = id;
+    jsonDoc["temperature"] = temperature;
+    jsonDoc["petId"] = petId;
+
+    String requestBody;
+    serializeJson(jsonDoc, requestBody);
+
+    int httpResponseCode = client.POST(requestBody);
+
+    if (httpResponseCode > 0) {
+      String response = client.getString();
+      Serial.println("Respuesta del servidor: " + response);
+    } else {
+      Serial.println("Error en la solicitud POST: " + String(httpResponseCode));
+    }
+
+    client.end();
+  } else {
+    Serial.println("WiFi no está conectado.");
+  }
+}
+
