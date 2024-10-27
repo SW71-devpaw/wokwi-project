@@ -99,3 +99,58 @@ void sendTemperatureData(int id, float temperature, int petId) {
   }
 }
 
+void obtenerCoordenadas(float &latitud, float &longitud) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(GeolocationAPI); // petición GET a la API de geolocalización
+
+    int httpCode = http.GET();
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+      StaticJsonDocument<512> doc;
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (!error) {
+        // Extraer latitud y longitud del JSON
+        latitud = doc["latitude"].as<float>();
+        longitud = doc["longitude"].as<float>();
+        Serial.println("Latitud: " + String(latitud, 6) + " | Longitud: " + String(longitud, 6));
+      } else {
+        Serial.println("Error parseando el JSON: " + String(error.c_str()));
+      }
+    } else {
+      Serial.println("Error en la solicitud HTTP: " + String(httpCode));
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi no está conectado");
+  }
+}
+
+void enviarDatos(float latitud, float longitud) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(LocationEndpoint);
+    http.addHeader("Content-Type", "application/json");
+
+    // Construimos el JSON con los datos a enviar
+    StaticJsonDocument<200> doc;
+    doc["id"] = id;
+    doc["lat"] = latitud;
+    doc["long"] = longitud;
+    doc["petId"] = petId;
+
+    String jsonData;
+    serializeJson(doc, jsonData);
+
+    int httpCode = http.POST(jsonData);
+    if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED) {
+      Serial.println("Datos enviados correctamente.");
+    } else {
+      Serial.println("Error enviando datos: " + String(httpCode));
+    }
+    http.end();
+  } else {
+    Serial.println("WiFi no está conectado");
+  }
+}
